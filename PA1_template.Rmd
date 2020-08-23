@@ -1,25 +1,137 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible Research: Course Project 1"
+output: html_document
 ---
+It is now possible to collect a large amount of data about personal movement using activity monitoring devices such as a Fitbit, Nike Fuelband, or Jawbone Up. These type of devices are part of the “quantified self” movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. But these data remain under-utilized both because the raw data are hard to obtain and there is a lack of statistical methods and software for processing and interpreting the data.
 
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
 
-## Loading and preprocessing the data
+The data for this assignment can be downloaded from the course web site:
+Dataset: Activity monitoring data [52K]
 
+The variables included in this dataset are:
 
+* steps: Number of steps taking in a 5-minute interval (missing values are coded as \color{red}{\verb|NA|}NA)
+* date: The date on which the measurement was taken in YYYY-MM-DD format
+* interval: Identifier for the 5-minute interval in which measurement was taken
 
-## What is mean total number of steps taken per day?
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
 
+## Reading in data
+First, we need to load data into R.
+``` {r} 
+setwd("~/Downloads/Reproducible Research")
+data <- read.csv("activity.csv", header = TRUE)
+```
+## Exploring data
+``` {r} 
+str(data)
+head(data)
+```
+## Prepocessing data
+We need to change date format into date
+``` {r} 
+data$date<-as.Date(data$date)
+```
+## Visualizing data 
+We will make a histogram of the total number of steps taken each day.
+```{r}
+stepperday <- with(data, tapply(steps, date, FUN=sum, na.rm =TRUE))
+hist(stepperday, xlab= "", main="Total number of steps taken each day")
+```
 
+Let's take a looking at the central tendency
+```{r}
+mean(stepperday)
+median(stepperday)
+```  
 
-## What is the average daily activity pattern?
+Let's check again with summary function
+```{r}
+summary(stepperday)
+```
+## Creating a time series plot
+```{r}
+stepperinterval <- aggregate(steps~interval, data=data, FUN=mean, na.rm =TRUE)
+plot(stepperinterval$interval, stepperinterval$steps,
+     type = "l", lwd = 2, col="blue",
+     xlab= "5-minute interval", 
+     ylab= "Average number of steps across all days",
+     main="Average number of steps taken in 5-minute interval")
+```
 
-
-
+Let's fetch the interval with maximum number of steps
+```{r}
+stepperinterval[which.max(stepperinterval$steps),]
+```
 ## Imputing missing values
+Note that there are a number of days/intervals where there are missing values (coded as \color{red}{\verb|NA|}NA). The presence of missing days may introduce bias into some calculations or summaries of the data.
 
+Let's calculate the total number of missing values in the dataset (i.e. the total number of rows with \color{red}{\verb|NA|}NAs).
 
+```{r}
+sum(is.na(data))
+```
 
-## Are there differences in activity patterns between weekdays and weekends?
+Let's fill in all of the missing values in the dataset by using the mean for that 5-minute interval.
+```{r}
+sum(is.na(data))
+```
+
+Now, we create a new dataset that is equal to the original dataset but with the missing data filled in.
+
+```{r}
+data2 <- data
+nulstep <- is.na(data2$steps)
+avg_interval <- tapply(data2$steps, data2$interval, mean, 
+                       na.rm=TRUE, simplify = TRUE)
+data2$steps[nulstep] <-avg_interval[as.character(data2$interval[nulstep])]
+
+# check if there are missing data in the new dataset
+sum(is.na(data2))
+```
+
+Now that we have imputed missing values. We might want to know if these values differ from the estimates from the first part of the assignment, or what the impact of imputing missing data on the estimates of the total daily number of steps is. Let's make a histogram of the total number of steps taken each day with the new and original data side by side for comparison. 
+
+```{r}
+par(mfrow = c(1,2))
+
+stepperday <- with(data, tapply(steps, date, FUN=sum, na.rm =TRUE))
+hist(stepperday, xlab= "", main="Total steps per day \n (original data)",
+     col = "green", ylim=c(0,35))
+
+newstepperday <- with(data2, tapply(steps, date, FUN=sum, na.rm =TRUE))
+hist(newstepperday, xlab= "", main="Total steps per day \n (with imputed data)", col = "blue", ylim=c(0,35))
+``` 
+
+Let's calculate the mean and median total number of steps taken per day with the new dataset.
+```{r}
+summary(data)
+summary(data2)
+``` 
+
+Next, we might want to know if there are differences in activity patterns between weekdays and weekends. For this part the \color{red}{\verb|weekdays()|}weekdays() function may be of some help here. Let's use the dataset with the filled-in missing values for this part.
+
+First, we create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+```{r}
+head(data2)
+# Add a new variable indicating weekday and weekend
+data2$dayofweek <- ifelse(weekdays(data2$date) =="Saturday"| weekdays(data2$date) =="Sunday", "Weekend", "Weekday")
+# Check the new variable
+head(data2)
+table(data2$dayofweek)
+``` 
+
+Then, we make a panel plot containing a time series plot (i.e. \color{red}{\verb|type = "l"|}type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).
+
+```{r}
+stepperinterval2 <- aggregate(steps~interval + dayofweek, data=data2, FUN=mean)
+# time series plot with ggplot
+library(ggplot2)
+ggplot(stepperinterval2, aes(x=interval, y= steps, color=dayofweek)) +
+  geom_line() + 
+  labs(title="Average daily steps taken in 5-minute interval",
+       x= "5-minute interval", 
+       y= "Number of steps") +
+  facet_wrap(~dayofweek, ncol=1, nrow=2)
+``` 
